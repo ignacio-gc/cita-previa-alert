@@ -1,13 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import Data.Text qualified as T
+import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy as TL
 import Text.HTML.Scalpel
 import Data.List (find)
 import Main.Utf8 (withUtf8)
 import Network.Mail.SMTP 
 import Network.Socket 
-import qualified Data.Text.IO as TIO
+import Text.HTML.TagSoup
+import Control.Exception (throwIO)
 
 -- Email config --
 
@@ -25,25 +27,50 @@ data EmailConfig = EmailConfig
 emailConfig :: EmailConfig
 emailConfig =
   EmailConfig
-    { emailFrom = Address Nothing "zzzz@mail.com",
-      emailTo = [Address (Just "Name") "zzzz@mail.com"],
+    { emailFrom = Address Nothing "",
+      emailTo = [Address (Just "Name") ""],
       emailSubject = "Turno disponible para pasaporte",
       smtpServer = "smtp.gmail.com",
       smtpPort = 465,
-      smtpUsername = "zzzz@mail.com",
-      smtpPassword = "xxxx xxxx xxxx xxxx",
+      smtpUsername = "",
+      smtpPassword = "",
       host = "smtp.gmail.com"
     }
 
+getTagTextOrFail :: String -> [Tag T.Text] -> IO T.Text
+getTagTextOrFail tagName tags =
+  case dropWhile (~/= TagOpen (T.pack tagName) []) tags of
+    (_ : TagText txt : _) -> return txt
+    _ -> throwIO $ userError $ "Missing tag: <" ++ tagName ++ ">"
+
+getEmailConfigs :: IO [Tag T.Text]
+getEmailConfigs = do
+  xml <- TIO.readFile "../config/configs.xml"
+  let tags = parseTags xml
+  return tags
+
 -- END Email config --
 
-sendNotificationEmail ::  T.Text -> T.Text -> IO ()
+sendNotificationEmail :: T.Text -> T.Text -> IO ()
 sendNotificationEmail date link = do
   let subject = "Notificación de turnos"
   let body = (T.concat ["Se encontró un turno disponible:\n\n", date, link])
   let htmlForMail = htmlPart $ TL.fromStrict $ T.concat ["<p>Se encontró un turno disponible:</p><ul><li><b>Fecha:</b> ", date, "</li><li><b>Link:</b> ", link, "</li></ul>"]
-  let mail = simpleMail (emailFrom emailConfig) (emailTo emailConfig) [] [] subject [plainTextPart (TL.fromStrict body), htmlForMail]
-  sendMailWithLoginTLS' (host emailConfig) (smtpPort emailConfig) (smtpUsername emailConfig) (smtpPassword emailConfig) mail
+  -- Complete emailConfig with data from config file ---
+  confs <- getEmailConfigs
+  mail <- getTagTextOrFail "mail-addr" confs
+  pass <- getTagTextOrFail "mail-pass" confs
+  name <- getTagTextOrFail "email-to-name" confs
+  let emailConfigWithMailAndPass =
+        emailConfig
+          { emailFrom = Address Nothing mail,
+            emailTo = [Address (Just name) mail],
+            smtpUsername = T.unpack mail,
+            smtpPassword = T.unpack pass
+          }
+  --- --- ---
+  let mail = simpleMail (emailFrom emailConfigWithMailAndPass) (emailTo emailConfigWithMailAndPass) [] [] subject [plainTextPart (TL.fromStrict body), htmlForMail]
+  sendMailWithLoginTLS' (host emailConfigWithMailAndPass) (smtpPort emailConfigWithMailAndPass) (smtpUsername emailConfigWithMailAndPass) (smtpPassword emailConfigWithMailAndPass) mail
 
 findDateAndLink :: [(Int, T.Text)] -> Maybe (T.Text, T.Text)
 findDateAndLink lst = do

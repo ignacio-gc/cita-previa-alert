@@ -73,6 +73,7 @@ executable cita-previa-alert
                     , with-utf8
                     , smtp-mail
                     , network
+                    , tagsoup
 
     -- Directories containing source files.
     hs-source-dirs:   app
