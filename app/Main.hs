@@ -60,7 +60,7 @@ sendNotificationEmail date link = do
   confs <- getEmailConfigs
   mail <- getTagTextOrFail "mail-addr" confs
   pass <- getTagTextOrFail "mail-pass" confs
-  name <- getTagTextOrFail "email-to-name" confs
+  name <- getTagTextOrFail "name" confs
   let emailConfigWithMailAndPass =
         emailConfig
           { emailFrom = Address Nothing mail,
