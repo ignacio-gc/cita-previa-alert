@@ -45,7 +45,7 @@ getTagTextOrFail tagName tags =
 
 getEmailConfigs :: IO [Tag T.Text]
 getEmailConfigs = do
-  xml <- TIO.readFile "../config/configs.xml"
+  xml <- TIO.readFile "config/config.xml"
   let tags = parseTags xml
   return tags
 
@@ -103,6 +103,8 @@ scraperPosAndHtmlInsideTr = chroots "td" $ do
 
 main :: IO ()
 main = withUtf8 $ do
+  --webPage <- TIO.readFile "data/Fechas de apertura de citas previas.htm"
+  -- let trResult = scrapeStringLike webPage scraperTrRenovacionPasaporte
   let url = "https://www.cgeonline.com.ar/informacion/apertura-de-citas.html"
   trResult <- scrapeURL url scraperTrRenovacionPasaporte
   case trResult of
